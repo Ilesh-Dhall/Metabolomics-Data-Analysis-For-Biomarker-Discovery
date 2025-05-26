@@ -347,9 +347,6 @@ ui <- page_navbar(
         )
       )
     )
-  ),
-  nav_panel(
-    "Biomarker Significance"
   )
 )
 
@@ -520,7 +517,7 @@ server <- function(input, output, session) {
       card(
         card_header("Model Performance Comparison"),
         layout_column_wrap(
-          width = 1 / 3,
+          width = 1/3,
           card(
             imageOutput("lr_cm")
           ),
@@ -551,49 +548,37 @@ server <- function(input, output, session) {
   })
 
   # Image Outputs for ROC Curve and Confusion Matrices
-  output$roc_auc <- renderImage(
-    {
-      list(
-        src = "/home/ilesh-dhall/Metabolomics-Biomarker-Discovery/plots/roc_auc.png",
-        alt = "Combined ROC AUC Curve (Logistic Regression and Random Forest)",
-        width = "100%"
-      )
-    },
-    deleteFile = FALSE
-  )
+  output$roc_auc <- renderImage({
+    list(
+      src = "/home/ilesh-dhall/Metabolomics-Biomarker-Discovery/plots/roc_auc.png",
+      alt = "Combined ROC AUC Curve (Logistic Regression and Random Forest)",
+      width = "100%"
+    )
+  }, deleteFile = FALSE)
 
-  output$lr_cm <- renderImage(
-    {
-      list(
-        src = "/home/ilesh-dhall/Metabolomics-Biomarker-Discovery/plots/lr_cm.png",
-        alt = "Logistic Regression Confusion Matrix",
-        width = "100%"
-      )
-    },
-    deleteFile = FALSE
-  )
+  output$lr_cm <- renderImage({
+    list(
+      src = "/home/ilesh-dhall/Metabolomics-Biomarker-Discovery/plots/lr_cm.png",
+      alt = "Logistic Regression Confusion Matrix",
+      width = "100%"
+    )
+  }, deleteFile = FALSE)
 
-  output$rf_cm <- renderImage(
-    {
-      list(
-        src = "/home/ilesh-dhall/Metabolomics-Biomarker-Discovery/plots/rf_cm.png",
-        alt = "Random Forest Confusion Matrix",
-        width = "100%"
-      )
-    },
-    deleteFile = FALSE
-  )
+  output$rf_cm <- renderImage({
+    list(
+      src = "/home/ilesh-dhall/Metabolomics-Biomarker-Discovery/plots/rf_cm.png",
+      alt = "Random Forest Confusion Matrix",
+      width = "100%"
+    )
+  }, deleteFile = FALSE)
 
-  output$ensemble_cm <- renderImage(
-    {
-      list(
-        src = "/home/ilesh-dhall/Metabolomics-Biomarker-Discovery/plots/ensemble_cm.png",
-        alt = "Ensemble Confusion Matrix",
-        width = "100%"
-      )
-    },
-    deleteFile = FALSE
-  )
+  output$ensemble_cm <- renderImage({
+    list(
+      src = "/home/ilesh-dhall/Metabolomics-Biomarker-Discovery/plots/ensemble_cm.png",
+      alt = "Ensemble Confusion Matrix",
+      width = "100%"
+    )
+  }, deleteFile = FALSE)
 
   # Comparative Analysis Metrics
   output$model_metrics <- renderPrint({
@@ -608,15 +593,14 @@ server <- function(input, output, session) {
     validate(
       need(length(input$ttest_metabolites) > 0, "Please select at least one metabolite")
     )
-
+    
     results <- lapply(input$ttest_metabolites, function(met) {
       tidy(t.test(data_clean[[met]] ~ data_clean$Effect, data = data_clean)) %>%
         mutate(Metabolite = met)
-    }) %>%
-      bind_rows() %>%
+    }) %>% bind_rows() %>%
       select(Metabolite, estimate, statistic, p.value, conf.low, conf.high) %>%
       mutate(p.value = round(p.value, 4))
-
+    
     results
   })
 
@@ -634,18 +618,18 @@ server <- function(input, output, session) {
     validate(
       need(length(input$ttest_metabolites) > 0, "Please select at least one metabolite")
     )
-
+    
     df_long <- data_clean %>%
       select(Effect, all_of(input$ttest_metabolites)) %>%
       pivot_longer(cols = all_of(input$ttest_metabolites), names_to = "Metabolite", values_to = "Intensity")
-
+    
     p <- ggplot(df_long, aes(x = Effect, y = Intensity, fill = Effect)) +
       geom_boxplot() +
       facet_wrap(~Metabolite, scales = "free_y") +
       labs(title = "Metabolite Intensities by Effect", x = "Effect", y = "Intensity") +
       theme_minimal() +
       theme(legend.position = "none")
-
+    
     ggplotly(p)
   })
 
@@ -655,17 +639,16 @@ server <- function(input, output, session) {
     validate(
       need(length(input$anova_metabolites) > 0, "Please select at least one metabolite")
     )
-
+    
     results <- lapply(input$anova_metabolites, function(met) {
       formula <- as.formula(paste(met, "~", input$anova_group))
       tidy(aov(formula, data = data_clean)) %>%
         mutate(Metabolite = met)
-    }) %>%
-      bind_rows() %>%
+    }) %>% bind_rows() %>%
       filter(term != "Residuals") %>%
       select(Metabolite, term, statistic, p.value) %>%
       mutate(p.value = round(p.value, 4))
-
+    
     results
   })
 
@@ -683,7 +666,7 @@ server <- function(input, output, session) {
     validate(
       need(length(input$anova_metabolites) > 0, "Please select at least one metabolite")
     )
-
+    
     df_summary <- data_clean %>%
       select(all_of(input$anova_metabolites), !!sym(input$anova_group)) %>%
       pivot_longer(cols = all_of(input$anova_metabolites), names_to = "Metabolite", values_to = "Intensity") %>%
@@ -693,7 +676,7 @@ server <- function(input, output, session) {
         SE = sd(Intensity, na.rm = TRUE) / sqrt(n()),
         .groups = "drop"
       )
-
+    
     p <- ggplot(df_summary, aes_string(x = input$anova_group, fill = input$anova_group)) +
       geom_bar(aes(y = Mean), stat = "identity") +
       geom_errorbar(aes(ymin = Mean - SE, ymax = Mean + SE), width = 0.4) +
@@ -701,7 +684,7 @@ server <- function(input, output, session) {
       labs(title = paste("Mean Intensities by", input$anova_group), x = input$anova_group, y = "Mean Intensity") +
       theme_minimal() +
       theme(legend.position = "none", axis.text.x = element_text(angle = 45, hjust = 1))
-
+    
     ggplotly(p)
   })
 
@@ -731,36 +714,36 @@ server <- function(input, output, session) {
     contingency_table <- table(data_clean$Effect, data_clean[[input$chisq_var]])
     contingency_df <- as.data.frame(contingency_table)
     colnames(contingency_df) <- c("Effect", input$chisq_var, "Count")
-
+    
     p <- ggplot(contingency_df, aes_string(x = input$chisq_var, y = "Count", fill = "Effect")) +
       geom_bar(stat = "identity", position = "dodge") +
       labs(title = paste("Effect vs.", input$chisq_var), x = input$chisq_var, y = "Count") +
       theme_minimal()
-
+    
     ggplotly(p)
   })
 
   # EDA Server Logic
   selected_dataset <- reactive({
     switch(input$eda_dataset,
-      "data" = data,
-      "data_wide" = data_wide,
-      "data_wide_selected" = data_wide_selected
+           "data" = data,
+           "data_wide" = data_wide,
+           "data_wide_selected" = data_wide_selected
     )
   })
 
   observe({
     req(selected_dataset())
     updateSelectInput(session, "eda_columns",
-      choices = names(selected_dataset())
+                      choices = names(selected_dataset())
     )
   })
 
   observe({
     req(selected_dataset())
     updateNumericInput(session, "eda_row_end",
-      max = nrow(selected_dataset()),
-      value = min(nrow(selected_dataset()))
+                       max = nrow(selected_dataset()),
+                       value = min(nrow(selected_dataset()))
     )
   })
 
@@ -813,24 +796,24 @@ server <- function(input, output, session) {
 
   selected_summary_dataset <- reactive({
     switch(input$summary_dataset,
-      "data" = data,
-      "data_wide" = data_wide,
-      "data_wide_selected" = data_wide_selected
+           "data" = data,
+           "data_wide" = data_wide,
+           "data_wide_selected" = data_wide_selected
     )
   })
 
   observe({
     req(selected_summary_dataset())
     updateSelectInput(session, "summary_columns",
-      choices = names(selected_summary_dataset())
+                      choices = names(selected_summary_dataset())
     )
   })
 
   observe({
     req(selected_summary_dataset())
     updateNumericInput(session, "summary_row_end",
-      max = nrow(selected_summary_dataset()),
-      value = min(10, nrow(selected_summary_dataset()))
+                       max = nrow(selected_summary_dataset()),
+                       value = min(10, nrow(selected_summary_dataset()))
     )
   })
 
@@ -851,14 +834,14 @@ server <- function(input, output, session) {
     summary_stats <- if (length(numeric_cols) > 0) {
       df %>%
         summarise(across(all_of(numeric_cols),
-          list(
-            Mean = ~ mean(., na.rm = TRUE),
-            Median = ~ median(., na.rm = TRUE),
-            Min = ~ min(., na.rm = TRUE),
-            Max = ~ max(., na.rm = TRUE),
-            SD = ~ sd(., na.rm = TRUE)
-          ),
-          .names = "{.col}_{.fn}"
+                         list(
+                           Mean = ~mean(., na.rm = TRUE),
+                           Median = ~median(., na.rm = TRUE),
+                           Min = ~min(., na.rm = TRUE),
+                           Max = ~max(., na.rm = TRUE),
+                           SD = ~sd(., na.rm = TRUE)
+                         ),
+                         .names = "{.col}_{.fn}"
         )) %>%
         tidyr::pivot_longer(everything(), names_to = c("Variable", "Statistic"), names_sep = "_", values_to = "Value") %>%
         tidyr::pivot_wider(names_from = Statistic, values_from = Value)
