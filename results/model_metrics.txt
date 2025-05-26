@@ -1,0 +1,92 @@
+[1] "Removing 2 rows with NA values in predictions or labels."
+[1] "Logistic Regression Confusion Matrix:"
+Confusion Matrix and Statistics
+
+             Reference
+Prediction    Non Cardiotoxic
+  Non         606         299
+  Cardiotoxic 127         187
+                                         
+               Accuracy : 0.6505         
+                 95% CI : (0.623, 0.6773)
+    No Information Rate : 0.6013         
+    P-Value [Acc > NIR] : 0.0002277      
+                                         
+                  Kappa : 0.2249         
+                                         
+ Mcnemar's Test P-Value : < 2.2e-16      
+                                         
+            Sensitivity : 0.3848         
+            Specificity : 0.8267         
+         Pos Pred Value : 0.5955         
+         Neg Pred Value : 0.6696         
+             Prevalence : 0.3987         
+         Detection Rate : 0.1534         
+   Detection Prevalence : 0.2576         
+      Balanced Accuracy : 0.6058         
+                                         
+       'Positive' Class : Cardiotoxic    
+                                         
+[1] "Logistic Regression F1-Score: 0.4675"
+[1] "Random Forest Confusion Matrix:"
+Confusion Matrix and Statistics
+
+             Reference
+Prediction    Non Cardiotoxic
+  Non         686          56
+  Cardiotoxic  47         430
+                                          
+               Accuracy : 0.9155          
+                 95% CI : (0.8985, 0.9305)
+    No Information Rate : 0.6013          
+    P-Value [Acc > NIR] : <2e-16          
+                                          
+                  Kappa : 0.8232          
+                                          
+ Mcnemar's Test P-Value : 0.4305          
+                                          
+            Sensitivity : 0.8848          
+            Specificity : 0.9359          
+         Pos Pred Value : 0.9015          
+         Neg Pred Value : 0.9245          
+             Prevalence : 0.3987          
+         Detection Rate : 0.3527          
+   Detection Prevalence : 0.3913          
+      Balanced Accuracy : 0.9103          
+                                          
+       'Positive' Class : Cardiotoxic     
+                                          
+[1] "Random Forest F1-Score: 0.893"
+[1] "Ensemble Confusion Matrix:"
+Confusion Matrix and Statistics
+
+             Reference
+Prediction    Non Cardiotoxic
+  Non         693          65
+  Cardiotoxic  40         421
+                                         
+               Accuracy : 0.9139         
+                 95% CI : (0.8967, 0.929)
+    No Information Rate : 0.6013         
+    P-Value [Acc > NIR] : < 2e-16        
+                                         
+                  Kappa : 0.8188         
+                                         
+ Mcnemar's Test P-Value : 0.01917        
+                                         
+            Sensitivity : 0.8663         
+            Specificity : 0.9454         
+         Pos Pred Value : 0.9132         
+         Neg Pred Value : 0.9142         
+             Prevalence : 0.3987         
+         Detection Rate : 0.3454         
+   Detection Prevalence : 0.3782         
+      Balanced Accuracy : 0.9058         
+                                         
+       'Positive' Class : Cardiotoxic    
+                                         
+[1] "Ensemble F1-Score: 0.8891"
+[1] "Logistic Regression PR AUC:"
+[1] 0.581401
+[1] "Random Forest PR AUC:"
+[1] 0.9552228
