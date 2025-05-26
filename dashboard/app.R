@@ -6,15 +6,20 @@ library(stats)
 library(dplyr)
 library(caret)
 library(plotly)
+library(broom)
+library(tidyr)
 
 data <- read.csv("/home/ilesh-dhall/Metabolomics-Biomarker-Discovery/data/A_Targeted_Metabolomics-Based_Assay_Using_Human_Induced_Pluripotent_Stem_Cell-Derived_Cardiomyocytes_rawdata.csv")
-
 data_wide <- read.csv("/home/ilesh-dhall/Metabolomics-Biomarker-Discovery/data/data_wide.csv")
-
 data_wide_selected <- read.csv("/home/ilesh-dhall/Metabolomics-Biomarker-Discovery/data/data_wide_selected_processed.csv")
 
 # Get feature names from data_wide_selected (excluding 'labels')
 feature_names <- names(data_wide_selected)[-which(names(data_wide_selected) == "labels")]
+
+# Prepare data_clean as in Testing.ipynb
+data_clean <- data_wide %>%
+  mutate(Effect = factor(Effect, levels = c("Non", "Cardiotoxic"))) %>%
+  na.omit()
 
 generateSidebar <- function(title, dataset, id_prefix) {
   sidebar(
@@ -106,7 +111,7 @@ ui <- page_navbar(
             selectInput(
               "eda_columns",
               "Select Columns:",
-              choices = NULL, # Populated reactively in server
+              choices = NULL,
               multiple = TRUE
             ),
             selectInput(
@@ -149,7 +154,7 @@ ui <- page_navbar(
             selectInput(
               "summary_columns",
               "Select Columns:",
-              choices = NULL, # Populated reactively in server
+              choices = NULL,
               multiple = TRUE
             ),
             numericInput(
@@ -175,7 +180,118 @@ ui <- page_navbar(
     )
   ),
   nav_panel(
-    "Statistical Testing"
+    title = "Statistical Testing",
+    navset_card_tab(
+      height = 400,
+      full_screen = TRUE,
+      title = "Statistical Analysis",
+      nav_panel(
+        "Info",
+        card(
+          card_header("Statistical Testing Overview"),
+          card_body(
+            markdown("
+              ### Statistical Testing Overview
+              This panel performs statistical analyses to identify significant differences and associations in metabolomics data related to cardiotoxicity, complementing the predictive models.
+
+              #### Data Preprocessing
+              - **Raw Data**: The dataset (`A_Targeted_Metabolomics-Based_Assay_..._rawdata.csv`) is transformed into a wide format (`data_wide`).
+              - **Cleaning**: Column names are sanitized using `make.names()` (e.g., `Arachidonic Acid` → `Arachidonic.Acid`). Rows with missing values are removed using `na.omit` (381 rows removed from 2,630).
+              - **Effect Variable**: The `Effect` column is converted to a factor with two levels (`Non`, `Cardiotoxic`) for t-tests, excluding `SolventControl` and `NA`.
+
+              #### Statistical Tests
+              - **T-Tests**: Compares metabolite intensities between `Non` and `Cardiotoxic` groups for selected metabolites. Significant results (p < 0.05) indicate metabolites that differ between groups.
+              - **ANOVA**: Tests differences in metabolite intensities across levels of `Compound` or `Dose`. Significant results (p < 0.05) suggest group-specific effects.
+              - **Chi-Square Test**: Examines associations between `Effect` (`Non` vs. `Cardiotoxic`) and categorical variables (`SampleType`, `Compound`, `Dose`). Significant p-values indicate non-random associations.
+
+              #### Outputs
+              - **Tables**: Significant results (p < 0.05) are displayed in interactive `DT` tables.
+              - **Plots**: Visualizations include boxplots (t-tests), bar plots with error bars (ANOVA), and bar plots (chi-square) to illustrate differences and associations.
+              - **Interpretation**: Results inform biomarker discovery by identifying key metabolites and patterns, supporting feature selection for the Logistic Regression (65% accuracy) and Random Forest (91% accuracy) models.
+
+              This analysis enhances the understanding of metabolomics data for cardiotoxicity biomarker discovery.
+            ")
+          )
+        )
+      ),
+      nav_panel(
+        "T-Tests",
+        layout_sidebar(
+          sidebar = sidebar(
+            title = "T-Test Controls",
+            selectInput(
+              "ttest_metabolites",
+              "Select Metabolites:",
+              choices = names(data_clean)[sapply(data_clean, is.numeric)],
+              multiple = TRUE,
+              selected = names(data_clean)[sapply(data_clean, is.numeric)][1]
+            ),
+            actionButton("ttest_apply", "Apply")
+          ),
+          card(
+            card_header("T-Test Results (Non vs. Cardiotoxic)"),
+            DTOutput("ttest_table"),
+            card_body(
+              "Compares metabolite intensities between Non and Cardiotoxic groups. Significant results (p < 0.05) are highlighted.",
+              plotlyOutput("ttest_plot", height = "400px")
+            )
+          )
+        )
+      ),
+      nav_panel(
+        "ANOVA",
+        layout_sidebar(
+          sidebar = sidebar(
+            title = "ANOVA Controls",
+            selectInput(
+              "anova_metabolites",
+              "Select Metabolites:",
+              choices = names(data_clean)[sapply(data_clean, is.numeric)],
+              multiple = TRUE,
+              selected = names(data_clean)[sapply(data_clean, is.numeric)][1]
+            ),
+            selectInput(
+              "anova_group",
+              "Group By:",
+              choices = c("Compound", "Dose"),
+              selected = "Compound"
+            ),
+            actionButton("anova_apply", "Apply")
+          ),
+          card(
+            card_header("ANOVA Results"),
+            DTOutput("anova_table"),
+            card_body(
+              "Tests differences in metabolite intensities across Compound or Dose. Significant results (p < 0.05) are highlighted.",
+              plotlyOutput("anova_plot", height = "400px")
+            )
+          )
+        )
+      ),
+      nav_panel(
+        "Chi-Square Test",
+        layout_sidebar(
+          sidebar = sidebar(
+            title = "Chi-Square Controls",
+            selectInput(
+              "chisq_var",
+              "Select Variable:",
+              choices = c("SampleType", "Compound", "Dose"),
+              selected = "SampleType"
+            ),
+            actionButton("chisq_apply", "Apply")
+          ),
+          card(
+            card_header("Chi-Square Test Results"),
+            DTOutput("chisq_table"),
+            card_body(
+              "Tests association between Effect (Non vs. Cardiotoxic) and selected variable.",
+              plotlyOutput("chisq_plot", height = "400px")
+            )
+          )
+        )
+      )
+    )
   ),
   nav_panel(
     "Predictive Modelling",
@@ -265,7 +381,7 @@ server <- function(input, output, session) {
     ]
   })
 
-  # Outputs
+  # Outputs for Data Viewer
   output$data_table <- renderDT({
     datatable(filtered_data(), options = list(pageLength = 10))
   })
@@ -311,11 +427,9 @@ server <- function(input, output, session) {
       need(length(input$logistic_metabolites) > 0, "Please select at least one metabolite")
     )
 
-    # Create input data frame with sanitized column names
     input_df <- as.data.frame(matrix(0, nrow = 1, ncol = length(logistic_sanitized_names)))
     colnames(input_df) <- logistic_sanitized_names
 
-    # Assign user inputs with validation
     for (met in input$logistic_metabolites) {
       sanitized_met <- make.names(met)
       value <- input[[paste0("logistic_value_", sanitized_met)]]
@@ -328,7 +442,6 @@ server <- function(input, output, session) {
       }
     }
 
-    # Predict without preprocessing
     pred <- predict(logistic_model, input_df, type = "prob")
 
     output$logistic_prediction <- renderPrint({
@@ -347,11 +460,9 @@ server <- function(input, output, session) {
       need(length(input$rf_metabolites) > 0, "Please select at least one metabolite")
     )
 
-    # Create input data frame with sanitized column names
     input_df <- as.data.frame(matrix(0, nrow = 1, ncol = length(rf_sanitized_names)))
     colnames(input_df) <- rf_sanitized_names
 
-    # Assign user inputs with validation
     for (met in input$rf_metabolites) {
       sanitized_met <- make.names(met)
       value <- input[[paste0("rf_value_", sanitized_met)]]
@@ -364,7 +475,6 @@ server <- function(input, output, session) {
       }
     }
 
-    # Predict without preprocessing
     pred <- predict(rf_model, input_df, type = "prob")
 
     output$rf_prediction <- renderPrint({
@@ -491,8 +601,146 @@ server <- function(input, output, session) {
     cat(paste(metrics, collapse = "\n"))
   })
 
+  # Statistical Testing Server Logic
+  # T-Test Logic
+  ttest_results <- eventReactive(input$ttest_apply, {
+    req(input$ttest_metabolites)
+    validate(
+      need(length(input$ttest_metabolites) > 0, "Please select at least one metabolite")
+    )
+
+    results <- lapply(input$ttest_metabolites, function(met) {
+      tidy(t.test(data_clean[[met]] ~ data_clean$Effect, data = data_clean)) %>%
+        mutate(Metabolite = met)
+    }) %>%
+      bind_rows() %>%
+      select(Metabolite, estimate, statistic, p.value, conf.low, conf.high) %>%
+      mutate(p.value = round(p.value, 4))
+
+    results
+  })
+
+  output$ttest_table <- renderDT({
+    req(ttest_results())
+    datatable(
+      ttest_results() %>% filter(p.value < 0.05),
+      options = list(pageLength = 10),
+      caption = "Significant T-Test Results (p < 0.05)"
+    )
+  })
+
+  output$ttest_plot <- renderPlotly({
+    req(input$ttest_metabolites)
+    validate(
+      need(length(input$ttest_metabolites) > 0, "Please select at least one metabolite")
+    )
+
+    df_long <- data_clean %>%
+      select(Effect, all_of(input$ttest_metabolites)) %>%
+      pivot_longer(cols = all_of(input$ttest_metabolites), names_to = "Metabolite", values_to = "Intensity")
+
+    p <- ggplot(df_long, aes(x = Effect, y = Intensity, fill = Effect)) +
+      geom_boxplot() +
+      facet_wrap(~Metabolite, scales = "free_y") +
+      labs(title = "Metabolite Intensities by Effect", x = "Effect", y = "Intensity") +
+      theme_minimal() +
+      theme(legend.position = "none")
+
+    ggplotly(p)
+  })
+
+  # ANOVA Logic
+  anova_results <- eventReactive(input$anova_apply, {
+    req(input$anova_metabolites, input$anova_group)
+    validate(
+      need(length(input$anova_metabolites) > 0, "Please select at least one metabolite")
+    )
+
+    results <- lapply(input$anova_metabolites, function(met) {
+      formula <- as.formula(paste(met, "~", input$anova_group))
+      tidy(aov(formula, data = data_clean)) %>%
+        mutate(Metabolite = met)
+    }) %>%
+      bind_rows() %>%
+      filter(term != "Residuals") %>%
+      select(Metabolite, term, statistic, p.value) %>%
+      mutate(p.value = round(p.value, 4))
+
+    results
+  })
+
+  output$anova_table <- renderDT({
+    req(anova_results())
+    datatable(
+      anova_results() %>% filter(p.value < 0.05),
+      options = list(pageLength = 10),
+      caption = paste("Significant ANOVA Results (p < 0.05) by", input$anova_group)
+    )
+  })
+
+  output$anova_plot <- renderPlotly({
+    req(input$anova_metabolites, input$anova_group)
+    validate(
+      need(length(input$anova_metabolites) > 0, "Please select at least one metabolite")
+    )
+
+    df_summary <- data_clean %>%
+      select(all_of(input$anova_metabolites), !!sym(input$anova_group)) %>%
+      pivot_longer(cols = all_of(input$anova_metabolites), names_to = "Metabolite", values_to = "Intensity") %>%
+      group_by(Metabolite, !!sym(input$anova_group)) %>%
+      summarise(
+        Mean = mean(Intensity, na.rm = TRUE),
+        SE = sd(Intensity, na.rm = TRUE) / sqrt(n()),
+        .groups = "drop"
+      )
+
+    p <- ggplot(df_summary, aes_string(x = input$anova_group, fill = input$anova_group)) +
+      geom_bar(aes(y = Mean), stat = "identity") +
+      geom_errorbar(aes(ymin = Mean - SE, ymax = Mean + SE), width = 0.4) +
+      facet_wrap(~Metabolite, scales = "free_y") +
+      labs(title = paste("Mean Intensities by", input$anova_group), x = input$anova_group, y = "Mean Intensity") +
+      theme_minimal() +
+      theme(legend.position = "none", axis.text.x = element_text(angle = 45, hjust = 1))
+
+    ggplotly(p)
+  })
+
+  # Chi-Square Logic
+  chisq_results <- eventReactive(input$chisq_apply, {
+    req(input$chisq_var)
+    contingency_table <- table(data_clean$Effect, data_clean[[input$chisq_var]])
+    chi_test <- chisq.test(contingency_table)
+    data.frame(
+      Statistic = chi_test$statistic,
+      P.value = round(chi_test$p.value, 4),
+      Df = chi_test$parameter
+    )
+  })
+
+  output$chisq_table <- renderDT({
+    req(chisq_results())
+    datatable(
+      chisq_results(),
+      options = list(pageLength = 5),
+      caption = paste("Chi-Square Test Results (Effect vs.", input$chisq_var, ")")
+    )
+  })
+
+  output$chisq_plot <- renderPlotly({
+    req(input$chisq_var)
+    contingency_table <- table(data_clean$Effect, data_clean[[input$chisq_var]])
+    contingency_df <- as.data.frame(contingency_table)
+    colnames(contingency_df) <- c("Effect", input$chisq_var, "Count")
+
+    p <- ggplot(contingency_df, aes_string(x = input$chisq_var, y = "Count", fill = "Effect")) +
+      geom_bar(stat = "identity", position = "dodge") +
+      labs(title = paste("Effect vs.", input$chisq_var), x = input$chisq_var, y = "Count") +
+      theme_minimal()
+
+    ggplotly(p)
+  })
+
   # EDA Server Logic
-  # Reactive to get selected dataset
   selected_dataset <- reactive({
     switch(input$eda_dataset,
       "data" = data,
@@ -501,16 +749,13 @@ server <- function(input, output, session) {
     )
   })
 
-  # Update column choices for EDA visualizations
   observe({
     req(selected_dataset())
     updateSelectInput(session, "eda_columns",
-      choices = names(selected_dataset()),
-      # selected = names(selected_dataset())[1]
+      choices = names(selected_dataset())
     )
   })
 
-  # Update row_end max value based on dataset
   observe({
     req(selected_dataset())
     updateNumericInput(session, "eda_row_end",
@@ -519,7 +764,6 @@ server <- function(input, output, session) {
     )
   })
 
-  # Reactive for filtered dataset (visualizations)
   filtered_eda_data <- eventReactive(input$eda_apply, {
     req(input$eda_columns, input$eda_row_start, input$eda_row_end)
     validate(
@@ -529,26 +773,22 @@ server <- function(input, output, session) {
     selected_dataset()[input$eda_row_start:input$eda_row_end, input$eda_columns, drop = FALSE]
   })
 
-  # Render interactive plot
   output$eda_plot <- renderPlotly({
     req(filtered_eda_data(), input$eda_plot_type)
     df <- filtered_eda_data()
 
-    # Ensure at least one numeric column for plotting
     numeric_cols <- names(df)[sapply(df, is.numeric)]
     validate(
       need(length(numeric_cols) > 0, "Please select at least one numeric column for plotting")
     )
 
     if (input$eda_plot_type == "Histogram") {
-      # Histogram for the first numeric column
       p <- ggplot(df, aes_string(x = numeric_cols[1])) +
         geom_histogram(bins = 30, fill = "#1a1818", color = "white") +
         theme_minimal() +
         labs(title = paste("Histogram of", numeric_cols[1]), x = numeric_cols[1], y = "Count")
       ggplotly(p)
     } else if (input$eda_plot_type == "Boxplot") {
-      # Boxplot for all numeric columns
       df_long <- tidyr::pivot_longer(df, cols = numeric_cols, names_to = "Variable", values_to = "Value")
       p <- ggplot(df_long, aes(x = Variable, y = Value)) +
         geom_boxplot(fill = "#6c757d", color = "#1a1818") +
@@ -557,7 +797,6 @@ server <- function(input, output, session) {
         theme(axis.text.x = element_text(angle = 45, hjust = 1))
       ggplotly(p)
     } else if (input$eda_plot_type == "Scatterplot") {
-      # Scatterplot for first two numeric columns
       validate(
         need(length(numeric_cols) >= 2, "Please select at least two numeric columns for scatterplot")
       )
@@ -572,7 +811,6 @@ server <- function(input, output, session) {
     }
   })
 
-  # Reactive to get selected dataset for summary
   selected_summary_dataset <- reactive({
     switch(input$summary_dataset,
       "data" = data,
@@ -581,16 +819,13 @@ server <- function(input, output, session) {
     )
   })
 
-  # Update column choices for summary
   observe({
     req(selected_summary_dataset())
     updateSelectInput(session, "summary_columns",
-      choices = names(selected_summary_dataset()),
-      # selected = names(selected_summary_dataset())[1:min(2, ncol(selected_summary_dataset()))]
+      choices = names(selected_summary_dataset())
     )
   })
 
-  # Update row_end max value for summary
   observe({
     req(selected_summary_dataset())
     updateNumericInput(session, "summary_row_end",
@@ -599,7 +834,6 @@ server <- function(input, output, session) {
     )
   })
 
-  # Reactive for filtered dataset (summary)
   filtered_summary_data <- eventReactive(input$summary_apply, {
     req(input$summary_columns, input$summary_row_start, input$summary_row_end)
     validate(
@@ -609,22 +843,20 @@ server <- function(input, output, session) {
     selected_summary_dataset()[input$summary_row_start:input$summary_row_end, input$summary_columns, drop = FALSE]
   })
 
-  # Render summary table
   output$summary_table <- renderDT({
     req(filtered_summary_data())
     df <- filtered_summary_data()
 
-    # Compute summary statistics for numeric columns
     numeric_cols <- names(df)[sapply(df, is.numeric)]
     summary_stats <- if (length(numeric_cols) > 0) {
       df %>%
         summarise(across(all_of(numeric_cols),
           list(
-            Mean = ~ mean(.x, na.rm = TRUE),
-            Median = ~ median(.x, na.rm = TRUE),
-            Min = ~ min(.x, na.rm = TRUE),
-            Max = ~ max(.x, na.rm = TRUE),
-            SD = ~ sd(.x, na.rm = TRUE)
+            Mean = ~ mean(., na.rm = TRUE),
+            Median = ~ median(., na.rm = TRUE),
+            Min = ~ min(., na.rm = TRUE),
+            Max = ~ max(., na.rm = TRUE),
+            SD = ~ sd(., na.rm = TRUE)
           ),
           .names = "{.col}_{.fn}"
         )) %>%
@@ -634,7 +866,11 @@ server <- function(input, output, session) {
       data.frame(Variable = character(), Mean = numeric(), Median = numeric(), Min = numeric(), Max = numeric(), SD = numeric())
     }
 
-    datatable(summary_stats, options = list(pageLength = 10, autoWidth = TRUE))
+    datatable(
+      summary_stats,
+      options = list(pageLength = 10, autoWidth = TRUE),
+      caption = if (length(numeric_cols) == 0) "No numeric columns selected" else "Summary Statistics"
+    )
   })
 }
 
